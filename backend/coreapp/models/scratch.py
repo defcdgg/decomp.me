@@ -3,8 +3,10 @@ import json
 import logging
 from typing import Any, Optional, Sequence
 
-from django.db import models, IntegrityError
+import itsdangerous
+from django.conf import settings
 from django.contrib import admin
+from django.db import IntegrityError, models
 from django.utils.crypto import get_random_string
 
 from ..libraries import Library
@@ -143,9 +145,6 @@ class Scratch(models.Model):
         related_name="children",
     )
     owner = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.SET_NULL)
-    claim_token = models.CharField(
-        max_length=64, blank=True, null=True, default=gen_claim_token
-    )
 
     class Meta:
         ordering = ["-creation_time"]
@@ -168,6 +167,19 @@ class Scratch(models.Model):
 
     def is_claimable(self) -> bool:
         return self.owner is None
+
+    @property
+    def claim_token(self) -> str:
+        s = itsdangerous.URLSafeSerializer(settings.SECRET_KEY, salt="claim-token")
+        return s.dumps({"slug": self.slug})
+
+    def verify_claim_token(self, token: str) -> bool:
+        s = itsdangerous.URLSafeSerializer(settings.SECRET_KEY, salt="claim-token")
+        try:
+            data: dict[str, str] = s.loads(token)
+            return isinstance(data, dict) and data.get("slug") == self.slug
+        except itsdangerous.BadData:
+            return False
 
 
 class ScratchAdmin(admin.ModelAdmin[Scratch]):

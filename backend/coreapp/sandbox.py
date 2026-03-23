@@ -14,17 +14,23 @@ from coreapp.error import SandboxError
 
 logger = logging.getLogger(__name__)
 
+PATH: str
+if settings.USE_SANDBOX_JAIL:
+    PATH = "/bin:/usr/bin"
+else:
+    PATH = os.environ["PATH"]
+
 
 class Sandbox(contextlib.AbstractContextManager["Sandbox"]):
     def __enter__(self) -> "Sandbox":
         self.use_jail = settings.USE_SANDBOX_JAIL
 
-        tmpdir: Optional[str] = None
+        tmpdir: Optional[Path] = None
         if self.use_jail:
             # Only use SANDBOX_TMP_PATH if USE_SANDBOX_JAIL is enabled,
             # otherwise use the system default
-            settings.SANDBOX_TMP_PATH.mkdir(parents=True, exist_ok=True)
-            tmpdir = str(settings.SANDBOX_TMP_PATH)
+            tmpdir = settings.SANDBOX_TMP_PATH
+            tmpdir.mkdir(parents=True, exist_ok=True)
 
         self.temp_dir = TemporaryDirectory(dir=tmpdir, ignore_cleanup_errors=True)
         self.path = Path(self.temp_dir.name)
@@ -77,7 +83,7 @@ class Sandbox(contextlib.AbstractContextManager["Sandbox"]):
             "--bindmount", f"{self.path}:/var/tmp",
             "--bindmount_ro", str(settings.COMPILER_BASE_PATH),
             "--bindmount_ro", str(settings.LIBRARY_BASE_PATH),
-            "--env", "PATH=/usr/bin:/bin",
+            "--env", f"PATH={PATH}",
             "--cwd", "/tmp",
             "--rlimit_fsize", "soft",
             "--rlimit_nofile", "soft",
@@ -95,8 +101,8 @@ class Sandbox(contextlib.AbstractContextManager["Sandbox"]):
             wrapper.append("--really_quiet")
         for mount in mounts:
             wrapper.extend(["--bindmount_ro", str(mount)])
-        for key in env:
-            wrapper.extend(["--env", key])
+        for key, value in env.items():
+            wrapper.extend(["--env", f"{key}={value}"])
 
         wrapper.append("--")
         return wrapper

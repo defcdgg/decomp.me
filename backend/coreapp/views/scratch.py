@@ -9,21 +9,20 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import django_filters
-from coreapp import compilers, platforms
 from django.core.files import File
-from django.db.models import F, FloatField, When, Case, Value
+from django.db.models import Case, F, FloatField, Value, When
 from django.db.models.functions import Cast
 from django.db.models.query import QuerySet
-
 from django.http import HttpResponse, QueryDict
 from django.utils.decorators import method_decorator
-
 from rest_framework import filters, mixins, serializers, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+
+from coreapp import compilers, platforms
 
 from ..compiler_wrapper import CompilationResult, CompilerWrapper, DiffResult
 from ..decompiler_wrapper import DecompilerWrapper
@@ -380,7 +379,7 @@ class ScratchViewSet(
             if "diff_label" in request.data:
                 scratch.diff_label = request.data["diff_label"]
             if "source_code" in request.data:
-                scratch.source_code = request.data["source_code"]
+                scratch.source_code = request.data["source_code"] or ""
             if "context" in request.data:
                 scratch_context = request.data["context"]
             if "libraries" in request.data:
@@ -448,12 +447,13 @@ class ScratchViewSet(
     @action(detail=True, methods=["POST"])
     def claim(self, request: Request, pk: str) -> Response:
         scratch: Scratch = self.get_object()
-        token = request.data.get("token")
+        token: Optional[str] = request.data.get("token")
 
-        if not scratch.is_claimable():
-            return Response({"success": False})
-
-        if scratch.claim_token and scratch.claim_token != token:
+        if (
+            token is None
+            or not scratch.is_claimable()
+            or not scratch.verify_claim_token(token)
+        ):
             return Response({"success": False})
 
         profile = request.profile
@@ -461,7 +461,6 @@ class ScratchViewSet(
         logger.debug(f"Granting ownership of scratch {scratch} to {profile}")
 
         scratch.owner = profile
-        scratch.claim_token = None
         scratch.save()
 
         return Response({"success": True})

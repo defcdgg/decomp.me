@@ -6,14 +6,17 @@ from functools import cache
 from pathlib import Path
 from typing import ClassVar, List, Optional, OrderedDict
 
+from django.conf import settings
+from rest_framework import status
+from rest_framework.exceptions import APIException
+
 from coreapp import platforms
 from coreapp.flags import (
     COMMON_ARMCC_FLAGS,
+    COMMON_BORLAND_FLAGS,
     COMMON_CLANG_FLAGS,
-    COMMON_GCC_GC_FLAGS,
-    COMMON_SHC_OLD_FLAGS,
-    COMMON_SHC_FLAGS,
     COMMON_GCC_FLAGS,
+    COMMON_GCC_GC_FLAGS,
     COMMON_GCC_PS1_FLAGS,
     COMMON_GCC_PS2_FLAGS,
     COMMON_GCC_SATURN_FLAGS,
@@ -24,13 +27,15 @@ from coreapp.flags import (
     COMMON_MWCC_PS2_FLAGS,
     COMMON_MWCC_PSP_FLAGS,
     COMMON_MWCC_WII_GC_FLAGS,
+    COMMON_SHC_FLAGS,
+    COMMON_SHC_OLD_FLAGS,
     COMMON_WATCOM_FLAGS,
-    COMMON_BORLAND_FLAGS,
     Flags,
     Language,
 )
 from coreapp.platforms import (
     ANDROID_X86,
+    DREAMCAST,
     GBA,
     GC_WII,
     IRIX,
@@ -43,21 +48,16 @@ from coreapp.platforms import (
     PS2,
     PSP,
     SATURN,
-    DREAMCAST,
     SWITCH,
     WIIU,
     WIN32,
     XBOX360,
     Platform,
 )
-from django.conf import settings
-from rest_framework import status
-from rest_framework.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
 CONFIG_PY = "config.py"
-COMPILER_BASE_PATH: Path = settings.COMPILER_BASE_PATH
 
 
 class CompilerType(enum.Enum):
@@ -82,11 +82,11 @@ class Compiler:
     def path(self) -> Path:
         if self.base_compiler is not None:
             return (
-                COMPILER_BASE_PATH
+                settings.COMPILER_BASE_PATH
                 / self.base_compiler.platform.id
                 / self.base_compiler.id
             )
-        return COMPILER_BASE_PATH / self.platform.id / self.id
+        return settings.COMPILER_BASE_PATH / self.platform.id / self.id
 
     def available(self) -> bool:
         # consider compiler binaries present if the compiler's directory is found
@@ -493,6 +493,11 @@ GCC263_PSX = GCCPS1Compiler(
     cc=PS1_GCC,
 )
 
+GCC272_CDK = GCCPS1Compiler(
+    id="gcc2.7.2-cdk",
+    cc=PS1_GCC,
+)
+
 GCC272_PSX = GCCPS1Compiler(
     id="gcc2.7.2-psx",
     cc=PS1_GCC,
@@ -564,7 +569,7 @@ DREAMCAST_CC_V50R10 = (
     'cat "$INPUT" | unix2dos > dos_src.c && '
     "cp -r ${COMPILER_DIR}/bin/* . && "
     "(SHC_LIB=. SHC_TMP=. ${WIBO} ${COMPILER_DIR}/bin/shc.exe dos_src.c -comment=nonest -cpu=sh4 -division=cpu -endian=little -macsave=0 -sjis -string=const ${COMPILER_FLAGS} -object=dos_src.obj) && "
-    "${WIBO} ${COMPILER_DIR}/bin/elfcnv.exe dos_src.obj ${OUTPUT}"
+    "python3 ${COMPILER_DIR}/rof2elf.py dos_src.obj ${OUTPUT} --isa=sh4"
 )
 
 SHC_V50R10 = SHCOldCompiler(
@@ -575,7 +580,7 @@ DREAMCAST_CC = (
     'cat "$INPUT" | unix2dos > dos_src.c && '
     "cp -r ${COMPILER_DIR}/bin/* . && "
     "(SHC_LIB=. SHC_TMP=. ${WIBO} ${COMPILER_DIR}/bin/shc.exe dos_src.c -comment=nonest -cpu=sh4 -division=cpu -fpu=single -endian=little -macsave=0 -sjis -string=const ${COMPILER_FLAGS} -object=dos_src.obj) && "
-    "${WIBO} ${COMPILER_DIR}/bin/elfcnv.exe dos_src.obj ${OUTPUT}"
+    "python3 ${COMPILER_DIR}/rof2elf.py dos_src.obj ${OUTPUT} --isa=sh4"
 )
 
 SHC_V50R26 = SHCCompiler(id="shc-v5.0r26", platform=DREAMCAST, cc=DREAMCAST_CC)
@@ -1651,6 +1656,7 @@ _all_compilers: List[Compiler] = [
     GCC257_PSX,
     GCC260_PSX,
     GCC263_PSX,
+    GCC272_CDK,
     GCC272_PSX,
     GCC280_PSX,
     GCC281_PSX,

@@ -1,5 +1,4 @@
 from django.urls import path
-
 from rest_framework.routers import DefaultRouter
 
 from coreapp.views import (
@@ -7,12 +6,12 @@ from coreapp.views import (
     library,
     platform,
     preset,
-    stats,
     project,
     scratch,
-    user,
-    search,
     scratch_count,
+    search,
+    stats,
+    user,
 )
 
 router = DefaultRouter(trailing_slash=False)
@@ -55,6 +54,11 @@ urlpatterns = [
         "users/<slug:username>/scratches",
         user.UserScratchList.as_view(),
         name="user-scratches",
+    ),
+    path(
+        "users/<slug:username>/stats",
+        user.UserScratchStats.as_view(),
+        name="user-scratch-stats",
     ),
     path("search", search.SearchViewSet.as_view(), name="search"),
     # TODO: remove (decomp-permuter still uses /compilers)

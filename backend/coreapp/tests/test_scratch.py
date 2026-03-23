@@ -1,17 +1,18 @@
-from time import sleep
-from typing import Any, Dict
 import io
 import zipfile
+from time import sleep
+from typing import Any, Dict
+
+from django.db.models import ProtectedError
+from django.urls import reverse
+from rest_framework import status
 
 from coreapp import compilers, platforms
-from coreapp.compilers import GCC281PM, IDO53, IDO71, MWCC_242_81, EE_GCC29_991111
+from coreapp.compilers import EE_GCC29_991111, GCC281PM, IDO53, IDO71, MWCC_242_81
 from coreapp.models.scratch import Assembly, Context, Scratch
 from coreapp.platforms import GC_WII, N64
 from coreapp.tests.common import BaseTestCase, requiresCompiler
 from coreapp.views.scratch import compile_scratch_update_score
-from django.db.models import ProtectedError
-from django.urls import reverse
-from rest_framework import status
 
 
 class ScratchCreationTests(BaseTestCase):
@@ -382,6 +383,7 @@ class ScratchForkTests(BaseTestCase):
         scratch = self.create_scratch(scratch_dict)
 
         slug = scratch.slug
+        old_claim_token = self.claim_tokens[slug]
 
         fork_dict = {
             "compiler": platforms.DUMMY.id,
@@ -411,7 +413,7 @@ class ScratchForkTests(BaseTestCase):
 
         # Ensure the new scratch has a (unique) claim token
         self.assertIsNotNone(new_claim_token)
-        self.assertIsNot(new_claim_token, scratch.claim_token)
+        self.assertIsNot(new_claim_token, old_claim_token)
 
 
 class ScratchDetailTests(BaseTestCase):
@@ -472,18 +474,17 @@ class ScratchDetailTests(BaseTestCase):
         """
         scratch = self.create_nop_scratch()
         self.assertIsNone(scratch.owner)
+        self.assertIsNotNone(scratch.claim_token)
 
-        scratch.claim_token = "1234"
-        scratch.save()
-
+        claim_token = self.claim_tokens[scratch.slug]
         response = self.client.post(
-            f"/api/scratch/{scratch.slug}/claim", {"token": "1234"}
+            f"/api/scratch/{scratch.slug}/claim", {"token": claim_token}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.json()["success"])
 
         response = self.client.post(
-            f"/api/scratch/{scratch.slug}/claim", {"token": "1234"}
+            f"/api/scratch/{scratch.slug}/claim", {"token": claim_token}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.json()["success"])
@@ -491,7 +492,6 @@ class ScratchDetailTests(BaseTestCase):
         updated_scratch = Scratch.objects.first()
         assert updated_scratch is not None
         self.assertIsNotNone(updated_scratch.owner)
-        self.assertIsNone(updated_scratch.claim_token)
 
     def test_family(self) -> None:
         root = self.create_nop_scratch()

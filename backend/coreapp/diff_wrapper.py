@@ -1,18 +1,17 @@
 import logging
-import subprocess
 import shlex
-from pathlib import Path
-from typing import List, Dict, Any
+import subprocess
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List
 
 import diff as asm_differ
-
-from coreapp.platforms import DUMMY, Platform
-from coreapp.flags import ASMDIFF_FLAG_PREFIX
 from django.conf import settings
 
-from .compiler_wrapper import DiffResult, PATH
+from coreapp.flags import ASMDIFF_FLAG_PREFIX
+from coreapp.platforms import DUMMY, Platform
 
+from .compiler_wrapper import DiffResult
 from .error import AssemblyError, DiffError, NmError, ObjdumpError
 from .models.scratch import Assembly
 from .sandbox import Sandbox
@@ -105,12 +104,6 @@ class DiffWrapper:
             nm_proc = sandbox.run_subprocess(
                 [platform.nm_cmd] + [sandbox.rewrite_path(target_path)],
                 shell=True,
-                env={
-                    "PATH": PATH,
-                    "COMPILER_BASE_PATH": sandbox.rewrite_path(
-                        settings.COMPILER_BASE_PATH
-                    ),
-                },
                 timeout=settings.OBJDUMP_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired:
@@ -190,12 +183,6 @@ class DiffWrapper:
                         + list(map(shlex.quote, flags))
                         + [sandbox.rewrite_path(target_path)],
                         shell=True,
-                        env={
-                            "PATH": PATH,
-                            "COMPILER_BASE_PATH": sandbox.rewrite_path(
-                                settings.COMPILER_BASE_PATH
-                            ),
-                        },
                         timeout=settings.OBJDUMP_TIMEOUT_SECONDS,
                     )
                 except subprocess.TimeoutExpired:
