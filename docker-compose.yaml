@@ -13,6 +13,9 @@ services:
     build:
       context: backend
       target: dev
+      args:
+        - http_proxy=http://192.168.0.8:10808
+        - https_proxy=http://192.168.0.8:10808
     cap_drop:
       - all
     cap_add:
@@ -21,6 +24,22 @@ services:
       - setfcap
     environment:
       - ENABLE_SWITCH_SUPPORT=NO
+      - ENABLE_IRIX_SUPPORT=NO
+      - ENABLE_N64_SUPPORT=NO
+      - ENABLE_GC_WII_SUPPORT=NO
+      - ENABLE_NDS_ARM9_SUPPORT=NO
+      - ENABLE_N3DS_SUPPORT=NO
+      - ENABLE_PS2_SUPPORT=NO
+      - ENABLE_PSP_SUPPORT=NO
+      - ENABLE_SATURN_SUPPORT=NO
+      - ENABLE_DREAMCAST_SUPPORT=NO
+      - ENABLE_MACOSX_SUPPORT=NO
+      - ENABLE_MSDOS_SUPPORT=NO
+      - ENABLE_WIIU_SUPPORT=NO
+      - ENABLE_WIN32_SUPPORT=NO
+      - ENABLE_XBOX360_SUPPORT=NO
+      - ENABLE_ANDROID_X86_SUPPORT=NO
+
     env_file:
       - backend/docker.dev.env
     ports:
