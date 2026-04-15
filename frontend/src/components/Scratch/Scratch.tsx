@@ -23,6 +23,7 @@ import {
     useMatchProgressBarEnabled,
     useDefaultDiffTab,
     DefaultDiffTab,
+    useSwapVerticalLayout,
 } from "@/lib/settings";
 
 import CompilerOpts from "../compiler/CompilerOpts";
@@ -46,6 +47,7 @@ import useLanguageServer from "./hooks/useLanguageServer";
 import AboutPanel from "./panels/AboutPanel";
 import DecompilationPanel from "./panels/DecompilePanel";
 import FamilyPanel from "./panels/FamilyPanel";
+import ProblemPanel from "./panels/ProblemPanel";
 import styles from "./Scratch.module.scss";
 import ScratchMatchBanner from "./ScratchMatchBanner";
 import ScratchProgressBar from "./ScratchProgressBar";
@@ -64,6 +66,7 @@ enum TabId {
     DECOMPILATION = "scratch_decompilation",
     FAMILY = "scratch_family",
     OBJDIFF = "scratch_objdiff",
+    PROBLEMS = "scratch_problems",
 }
 
 const DEFAULT_LAYOUTS: Record<"desktop_2col" | "mobile_2row", Layout> = {
@@ -102,26 +105,48 @@ const DEFAULT_LAYOUTS: Record<"desktop_2col" | "mobile_2row", Layout> = {
             {
                 key: 1,
                 kind: "pane",
-                size: 50,
-                activeTab: TabId.DIFF,
+                size: 40,
+                activeTab: TabId.SOURCE_CODE,
                 tabs: [
                     TabId.ABOUT,
                     TabId.FAMILY,
-                    TabId.DIFF,
-                    TabId.OBJDIFF,
-                    TabId.DECOMPILATION,
+                    TabId.SOURCE_CODE,
+                    TabId.CONTEXT,
+                    TabId.OPTIONS,
                 ],
             },
             {
                 key: 2,
                 kind: "pane",
-                size: 50,
-                activeTab: TabId.SOURCE_CODE,
-                tabs: [TabId.SOURCE_CODE, TabId.CONTEXT, TabId.OPTIONS],
+                size: 60,
+                activeTab: TabId.DIFF,
+                tabs: [
+                    TabId.DIFF,
+                    TabId.OBJDIFF,
+                    TabId.PROBLEMS,
+                    TabId.DECOMPILATION,
+                ],
             },
         ],
     },
 };
+
+function maybeSwapVerticalLayout(
+    layout: Layout,
+    layoutName: string,
+    swap: boolean,
+): Layout {
+    if (layoutName !== "mobile_2row" || !swap) {
+        return layout;
+    }
+    if (layout.kind !== "vertical" || layout.children.length !== 2) {
+        return layout;
+    }
+
+    const clone = cloneValue(layout);
+    clone.children = [...clone.children].reverse();
+    return clone;
+}
 
 function getDefaultLayout(
     width: number,
@@ -227,6 +252,8 @@ export default function Scratch({
         contextEditor,
         shouldCompare ? parentScratch?.context : undefined,
     );
+
+    const [swapVerticalLayout] = useSwapVerticalLayout();
 
     const [saveSource, saveContext] = useLanguageServer(
         languageServerEnabledSetting,
@@ -415,6 +442,7 @@ export default function Scratch({
                                 isCompiling={isCompiling}
                                 isCompilationOld={isCompilationOld}
                                 perSaveObj={perSaveObj}
+                                showProblems={layoutName !== "mobile_2row"}
                             />
                         )}
                     </Tab>
@@ -463,6 +491,18 @@ export default function Scratch({
                         {() => <FamilyPanel scratch={scratch} />}
                     </Tab>
                 );
+            case TabId.PROBLEMS:
+                return (
+                    compilation?.compiler_output && (
+                        <Tab key={id} tabKey={id} label="Problems">
+                            {() => (
+                                <ProblemPanel
+                                    text={compilation.compiler_output}
+                                />
+                            )}
+                        </Tab>
+                    )
+                );
             default:
                 return <Tab key={id} tabKey={id} label={id} disabled />;
         }
@@ -477,9 +517,13 @@ export default function Scratch({
         if (layoutName !== preferredLayout) {
             setLayoutName(preferredLayout);
             setLayout(
-                applyDefaultDiffTab(
-                    cloneValue(DEFAULT_LAYOUTS[preferredLayout]),
-                    defaultDiffTab,
+                maybeSwapVerticalLayout(
+                    applyDefaultDiffTab(
+                        cloneValue(DEFAULT_LAYOUTS[preferredLayout]),
+                        defaultDiffTab,
+                    ),
+                    preferredLayout,
+                    swapVerticalLayout,
                 ),
             );
         }
@@ -520,9 +564,7 @@ export default function Scratch({
                     setDecompilationTabEnabled={setDecompilationTabEnabled}
                 />
                 {matchProgressBarEnabledSetting && (
-                    <div className={styles.progressbar}>
-                        <ScratchProgressBar matchPercent={matchPercent} />
-                    </div>
+                    <ScratchProgressBar matchPercent={matchPercent} />
                 )}
             </ErrorBoundary>
             <ErrorBoundary>
