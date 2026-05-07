@@ -69,6 +69,7 @@ class Sandbox(contextlib.AbstractContextManager["Sandbox"]):
             "--chroot", str(settings.SANDBOX_CHROOT_PATH),
             "--bindmount", f"{self.path}:/tmp",
             "--bindmount", f"{self.path}:/run/user/{os.getuid()}",
+            "--bindmount", f"{self.path}:/var/tmp",
             "--bindmount_ro", "/dev",
             "--bindmount_ro", "/bin",
             "--bindmount_ro", "/etc/alternatives",
@@ -80,12 +81,14 @@ class Sandbox(contextlib.AbstractContextManager["Sandbox"]):
             "--bindmount_ro", "/usr",
             "--bindmount_ro", "/proc",
             "--bindmount_ro", "/sys",
-            "--bindmount", f"{self.path}:/var/tmp",
             "--bindmount_ro", str(settings.COMPILER_BASE_PATH),
             "--bindmount_ro", str(settings.LIBRARY_BASE_PATH),
             "--env", f"PATH={PATH}",
             "--cwd", "/tmp",
-            "--rlimit_fsize", "soft",
+            # NOTE: "soft" resolves to a near-infinite RLIMIT_FSIZE in nsjail >=3.6,
+            # which causes some of the compilers/tooling to fail with "File too large" (SIGXFSZ).
+            # Use a large finite value instead.
+            "--rlimit_fsize", "512",  # 512 MB
             "--rlimit_nofile", "soft",
             # the following are settings that can be removed once we are done with wine
             "--bindmount_ro", f"{settings.WINEPREFIX}:/wine",

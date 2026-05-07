@@ -6,7 +6,8 @@ export interface Page<T> {
 
 export interface AnonymousUser {
     is_anonymous: true;
-    id: number;
+    is_ephemeral: boolean;
+    id: number | null;
     is_online: boolean;
     is_admin: boolean;
     username: string;
@@ -116,6 +117,12 @@ export type Flag =
           type: "flagset";
           id: string;
           flags: string[];
+      }
+    | {
+          type: "parameter";
+          format: "string" | "int" | "hex" | "int-or-hex";
+          id: string;
+          flag: string;
       };
 
 export type Library = {
